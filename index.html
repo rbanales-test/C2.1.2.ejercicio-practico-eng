@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sound Design: Snare Drum</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            color: #333;
+        }
+        .synth-card {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+        h2 { margin-top: 0; font-size: 1.4rem; color: #1a73e8; }
+        .description { font-size: 0.9rem; color: #5f6368; margin-bottom: 24px; }
+        .control-group {
+            margin-bottom: 20px;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #e8eaed;
+        }
+        .control-group h3 { margin: 0 0 12px 0; font-size: 0.95rem; color: #202124; }
+        .label-container {
+            display: flex; justify-content: space-between;
+            font-size: 0.85rem; margin-bottom: 8px; font-weight: 600; color: #5f6368;
+        }
+        input[type=range] { width: 100%; margin-bottom: 12px; accent-color: #1a73e8; }
+        
+        .button-group { display: flex; gap: 10px; margin-bottom: 15px; }
+        .btn-solo {
+            flex: 1; background: #f1f3f4; color: #3c4043; border: 1px solid #dadce0;
+            padding: 10px; border-radius: 6px; font-weight: 600; cursor: pointer; transition: 0.2s;
+        }
+        .btn-solo:hover { background: #e8eaed; }
+        .btn-solo:focus-visible { outline: 2px solid #1a73e8; outline-offset: 2px; }
+        .btn-main {
+            width: 100%; background: #1a73e8; color: white; border: none;
+            padding: 16px; border-radius: 8px; font-size: 1.1rem; font-weight: bold;
+            cursor: pointer; transition: background 0.2s; box-shadow: 0 4px 6px rgba(26,115,232,0.2);
+        }
+        .btn-main:hover { background: #1557b0; }
+        .btn-main:focus-visible { outline: 2px solid #1557b0; outline-offset: 2px; }
+        button:active { transform: scale(0.98); }
+    </style>
+</head>
+<body>
+
+    <main class="synth-card" role="region" aria-labelledby="main-title">
+        <h2 id="main-title">Sound Design: Snare Drum</h2>
+        <p class="description" id="app-description">Isolate the components or play them together to understand how the sound is built.</p>
+        
+        <section class="control-group" aria-labelledby="tone-heading">
+            <h3 id="tone-heading">Component 1: Wooden Shell (Oscillator)</h3>
+            <div class="label-container">
+                <label for="toneDecay">Amplitude Decay</label>
+                <span id="toneDecayVal" aria-live="polite" aria-atomic="true">100 ms</span>
+            </div>
+            <input type="range" id="toneDecay" min="10" max="300" value="100" aria-describedby="toneDecayVal">
+        </section>
+
+        <section class="control-group" aria-labelledby="noise-heading">
+            <h3 id="noise-heading">Component 2: Snare Wires (Noise)</h3>
+            <div class="label-container">
+                <label for="noiseDecay">Amplitude Decay</label>
+                <span id="noiseDecayVal" aria-live="polite" aria-atomic="true">200 ms</span>
+            </div>
+            <input type="range" id="noiseDecay" min="10" max="500" value="200" aria-describedby="noiseDecayVal">
+            
+            <div class="label-container">
+                <label for="filterFreq">High-Pass Filter</label>
+                <span id="filterFreqVal" aria-live="polite" aria-atomic="true">1000 Hz</span>
+            </div>
+            <input type="range" id="filterFreq" min="500" max="5000" value="1000" aria-describedby="filterFreqVal">
+        </section>
+
+        <div class="button-group">
+            <button class="btn-solo" id="btnTone" aria-label="Play tone component only">Solo Tone</button>
+            <button class="btn-solo" id="btnNoise" aria-label="Play noise component only">Solo Noise</button>
+        </div>
+        <button class="btn-main" id="playBtn" aria-label="Play full snare drum sound">Play Full Snare</button>
+    </main>
+
+    <script>
+        let audioCtx;
+        
+        const ui = {
+            toneDecay: document.getElementById('toneDecay'),
+            noiseDecay: document.getElementById('noiseDecay'),
+            filterFreq: document.getElementById('filterFreq'),
+            btnTone: document.getElementById('btnTone'),
+            btnNoise: document.getElementById('btnNoise'),
+            btnPlay: document.getElementById('playBtn')
+        };
+
+        // Update visual values and screen reader text
+        ui.toneDecay.addEventListener('input', (e) => {
+            document.getElementById('toneDecayVal').innerText = e.target.value + ' ms';
+        });
+        ui.noiseDecay.addEventListener('input', (e) => {
+            document.getElementById('noiseDecayVal').innerText = e.target.value + ' ms';
+        });
+        ui.filterFreq.addEventListener('input', (e) => {
+            document.getElementById('filterFreqVal').innerText = e.target.value + ' Hz';
+        });
+
+        function playSound(playTone, playNoise) {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            const time = audioCtx.currentTime;
+            const tDecay = parseFloat(ui.toneDecay.value) / 1000;
+            const nDecay = parseFloat(ui.noiseDecay.value) / 1000;
+            const fFreq = parseFloat(ui.filterFreq.value);
+
+            // --- TONE COMPONENT ---
+            if (playTone) {
+                const osc = audioCtx.createOscillator();
+                const toneGain = audioCtx.createGain();
+                osc.type = 'triangle';
+                
+                // Pitch Envelope
+                osc.frequency.setValueAtTime(250, time);
+                osc.frequency.exponentialRampToValueAtTime(0.01, time + 0.1);
+
+                // Amplitude Envelope
+                toneGain.gain.setValueAtTime(1, time);
+                toneGain.gain.exponentialRampToValueAtTime(0.01, time + tDecay);
+
+                osc.connect(toneGain);
+                toneGain.connect(audioCtx.destination);
+                
+                osc.start(time);
+                osc.stop(time + tDecay);
+            }
+
+            // --- NOISE COMPONENT ---
+            if (playNoise) {
+                const bufferSize = audioCtx.sampleRate * nDecay; 
+                const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                const output = noiseBuffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) output[i] = Math.random() * 2 - 1;
+
+                const noiseSrc = audioCtx.createBufferSource();
+                noiseSrc.buffer = noiseBuffer;
+
+                // High-Pass Filter
+                const filter = audioCtx.createBiquadFilter();
+                filter.type = 'highpass';
+                filter.frequency.value = fFreq;
+
+                // Amplitude Envelope
+                const noiseGain = audioCtx.createGain();
+                noiseGain.gain.setValueAtTime(1, time);
+                noiseGain.gain.exponentialRampToValueAtTime(0.01, time + nDecay);
+
+                noiseSrc.connect(filter);
+                filter.connect(noiseGain);
+                noiseGain.connect(audioCtx.destination);
+                
+                noiseSrc.start(time);
+            }
+        }
+
+        // Event Listeners
+        ui.btnPlay.addEventListener('click', () => playSound(true, true));
+        ui.btnTone.addEventListener('click', () => playSound(true, false));
+        ui.btnNoise.addEventListener('click', () => playSound(false, true));
+    </script>
+</body>
+</html>
